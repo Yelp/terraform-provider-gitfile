@@ -127,22 +127,26 @@ func FileUpdate(d *schema.ResourceData, meta interface{}) error {
 		return err
 	}
 
-	git_add := exec.Command("git", "add", "--intent-to-add", "--", filepath)
-	git_add.Dir = checkout_dir
-	if err := git_add.Run(); err != nil {
-		return err
-	}
+	// Only bother trying to commit things if the contents have changed.
+	// I'm pretty sure this should be relatively accurate, since terraform will generally call FileRead before this.
+	if d.HasChange("contents") {
+		git_add := exec.Command("git", "add", "--intent-to-add", "--", filepath)
+		git_add.Dir = checkout_dir
+		if err := git_add.Run(); err != nil {
+			return err
+		}
 
-	git_commit := exec.Command("git", "commit", "-m", commit_message, "--", filepath)
-	git_commit.Dir = checkout_dir
-	if err := git_commit.Run(); err != nil {
-		return err
-	}
+		git_commit := exec.Command("git", "commit", "-m", commit_message, "--", filepath)
+		git_commit.Dir = checkout_dir
+		if err := git_commit.Run(); err != nil {
+			return err
+		}
 
-	git_push := exec.Command("git", "push", repo, fmt.Sprintf("HEAD:%s", branch))
-	git_push.Dir = checkout_dir
-	if err := git_push.Run(); err != nil {
-		return err
+		git_push := exec.Command("git", "push", repo, fmt.Sprintf("HEAD:%s", branch))
+		git_push.Dir = checkout_dir
+		if err := git_push.Run(); err != nil {
+			return err
+		}
 	}
 	return nil
 }
