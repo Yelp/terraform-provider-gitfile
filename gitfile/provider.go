@@ -131,21 +131,15 @@ func FileUpdate(d *schema.ResourceData, meta interface{}) error {
 	// Only bother trying to commit things if the contents have changed.
 	// I'm pretty sure this should be relatively accurate, since terraform will generally call FileRead before this.
 	if d.HasChange("contents") {
-		git_add := exec.Command("git", "add", "--intent-to-add", "--", filepath)
-		git_add.Dir = checkout_dir
-		if err := git_add.Run(); err != nil {
+		if err := gitCommand(checkout_dir, "add", "--intent-to-add", "--", filepath); err != nil {
 			return err
 		}
 
-		git_commit := exec.Command("git", "commit", "-m", commit_message, "--", filepath)
-		git_commit.Dir = checkout_dir
-		if err := git_commit.Run(); err != nil {
+		if err := gitCommand(checkout_dir, "commit", "-m", commit_message, "--", filepath); err != nil {
 			return err
 		}
 
-		git_push := exec.Command("git", "push", repo, fmt.Sprintf("HEAD:%s", branch))
-		git_push.Dir = checkout_dir
-		if err := git_push.Run(); err != nil {
+		if err := gitCommand(checkout_dir, "push", repo, fmt.Sprintf("HEAD:%s", branch)); err != nil {
 			return err
 		}
 	}
@@ -160,29 +154,21 @@ func FileDelete(d *schema.ResourceData, meta interface{}) error {
 	checkout_dir := path.Join(workdir, mungeGitDir(d.Id()))
 	commit_message := d.Get("commit_message").(string)
 
-	git_rm := exec.Command("git", "rm", "--ignore-unmatch", "--", filepath)
-	git_rm.Dir = checkout_dir
-	if err := git_rm.Run(); err != nil {
+	if err := gitCommand(checkout_dir, "rm", "--ignore-unmatch", "--", filepath); err != nil {
 		return err
 	}
 
-	git_diff_index := exec.Command("git", "diff-index", "--exit-code", "--quiet", "HEAD", "--", filepath)
-	git_diff_index.Dir = checkout_dir
-	if err := git_diff_index.Run(); err != nil {
+	if err := gitCommand(checkout_dir, "diff-index", "--exit-code", "--quiet", "HEAD", "--", filepath); err != nil {
 		exitErr, isExitErr := err.(*exec.ExitError)
 		if isExitErr {
 			if exitErr.Sys().(syscall.WaitStatus).ExitStatus() != 1 {
 				return err
 			} else {
-				git_commit := exec.Command("git", "commit", "-m", commit_message, "--", filepath)
-				git_commit.Dir = checkout_dir
-				if err := git_commit.Run(); err != nil {
+				if err := gitCommand(checkout_dir, "commit", "-m", commit_message, "--", filepath); err != nil {
 					return err
 				}
 
-				git_push := exec.Command("git", "push", repo, fmt.Sprintf("HEAD:%s", branch))
-				git_push.Dir = checkout_dir
-				if err := git_push.Run(); err != nil {
+				if err := gitCommand(checkout_dir, "push", repo, fmt.Sprintf("HEAD:%s", branch)); err != nil {
 					return err
 				}
 			}
@@ -194,6 +180,14 @@ func FileDelete(d *schema.ResourceData, meta interface{}) error {
 	return nil
 }
 
+func gitCommand(checkout_dir string, args ...string) error {
+	command := exec.Command("git", args...)
+	command.Dir = checkout_dir
+	if err := command.Run(); err != nil {
+		return err
+	}
+	return nil
+}
 
 func mungeGitDir(id string) string {
 	return b64.URLEncoding.EncodeToString([]byte(id))
@@ -205,15 +199,11 @@ func shallowSparseGitCheckout(checkout_dir, repo, branch, filepath string) error
 	}
 
 	// git init appears to be idempotent.
-	git_init := exec.Command("git", "init")
-	git_init.Dir = checkout_dir
-	if err := git_init.Run(); err != nil {
+	if err := gitCommand(checkout_dir, "init"); err != nil {
 		return err
 	}
 
-	git_config := exec.Command("git", "config", "core.sparsecheckout", "true")
-	git_config.Dir = checkout_dir
-	if err := git_config.Run(); err != nil {
+	if err := gitCommand(checkout_dir, "config", "core.sparsecheckout", "true"); err != nil {
 		return err
 	}
 
@@ -225,21 +215,15 @@ func shallowSparseGitCheckout(checkout_dir, repo, branch, filepath string) error
 		return err
 	}
 
-	git_fetch := exec.Command("git", "fetch", "--depth", "1", repo, branch)
-	git_fetch.Dir = checkout_dir
-	if err := git_fetch.Run(); err != nil {
+	if err := gitCommand(checkout_dir, "fetch", "--depth", "1", repo, branch); err != nil {
 		return err
 	}
 
-	git_checkout := exec.Command("git", "checkout", "--force", "FETCH_HEAD")
-	git_checkout.Dir = checkout_dir
-	if err := git_checkout.Run(); err != nil {
+	if err := gitCommand(checkout_dir, "checkout", "--force", "FETCH_HEAD"); err != nil {
 		return err
 	}
 
-	git_clean := exec.Command("git", "clean", "-ffdx")
-	git_clean.Dir = checkout_dir
-	if err := git_clean.Run(); err != nil {
+	if err := gitCommand(checkout_dir, "clean", "-ffdx"); err != nil {
 		return err
 	}
 
