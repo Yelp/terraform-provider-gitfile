@@ -58,6 +58,11 @@ func fileResource() *schema.Resource {
 				Optional: true,
 				Default: "master",
 			},
+			"commit_message": &schema.Schema{
+				Type: schema.TypeString,
+				Optional: true,
+				Default: "Created by terraform gitfile_file",
+			},
 		},
 		Create: FileCreate,
 		Read: FileRead,
@@ -67,8 +72,19 @@ func fileResource() *schema.Resource {
 }
 
 func FileCreate(d *schema.ResourceData, meta interface{}) error {
-	d.SetId(fmt.Sprintf("%s %s %s", d.Get("repo"), d.Get("branch"), d.Get("path")))
-	return nil
+	repo := d.Get("repo").(string)
+	branch := d.Get("branch").(string)
+	filepath := d.Get("path").(string)
+	workdir := meta.(*gitfileConfig).workDir
+
+	d.SetId(fmt.Sprintf("%s %s %s", repo, branch, filepath))
+
+	checkout_dir := path.Join(workdir, mungeGitDir(d.Id()))
+	if err := shallowSparseGitCheckout(checkout_dir, repo, branch, filepath); err != nil {
+		return err
+	}
+
+	return FileUpdate(d, meta)
 }
 func FileRead(d *schema.ResourceData, meta interface{}) error {
 	splits := strings.SplitN(d.Id(), " ", 3)
@@ -99,6 +115,35 @@ func FileRead(d *schema.ResourceData, meta interface{}) error {
 	return nil
 }
 func FileUpdate(d *schema.ResourceData, meta interface{}) error {
+	repo := d.Get("repo").(string)
+	branch := d.Get("branch").(string)
+	filepath := d.Get("path").(string)
+	contents := d.Get("contents").(string)
+	commit_message := d.Get("commit_message").(string)
+	workdir := meta.(*gitfileConfig).workDir
+	checkout_dir := path.Join(workdir, mungeGitDir(d.Id()))
+
+	if err := ioutil.WriteFile(path.Join(checkout_dir, filepath), []byte(contents), 0666); err != nil {
+		return err
+	}
+
+	git_add := exec.Command("git", "add", "--intent-to-add", "--", filepath)
+	git_add.Dir = checkout_dir
+	if err := git_add.Run(); err != nil {
+		return err
+	}
+
+	git_commit := exec.Command("git", "commit", "-m", commit_message, "--", filepath)
+	git_commit.Dir = checkout_dir
+	if err := git_commit.Run(); err != nil {
+		return err
+	}
+
+	git_push := exec.Command("git", "push", repo, fmt.Sprintf("HEAD:%s", branch))
+	git_push.Dir = checkout_dir
+	if err := git_push.Run(); err != nil {
+		return err
+	}
 	return nil
 }
 func FileDelete(d *schema.ResourceData, meta interface{}) error {
@@ -128,14 +173,11 @@ func shallowSparseGitCheckout(checkout_dir, repo, branch, filepath string) error
 		return err
 	}
 
-	scf, err := os.Create(path.Join(checkout_dir, ".git", "info", "sparse-checkout"), )
-	if err != nil {
-		return err
-	}
-	if _, err := scf.WriteString(filepath); err != nil {
-		return err
-	}
-	if err := scf.Close(); err != nil {
+	if err := ioutil.WriteFile(
+		path.Join(checkout_dir, ".git", "info", "sparse-checkout"),
+		[]byte(filepath),
+		0666,
+	); err != nil {
 		return err
 	}
 
@@ -150,5 +192,12 @@ func shallowSparseGitCheckout(checkout_dir, repo, branch, filepath string) error
 	if err := git_checkout.Run(); err != nil {
 		return err
 	}
+
+	git_clean := exec.Command("git", "clean", "-ffdx")
+	git_clean.Dir = checkout_dir
+	if err := git_clean.Run(); err != nil {
+		return err
+	}
+
 	return nil
 }
