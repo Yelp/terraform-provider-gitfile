@@ -9,6 +9,7 @@ import (
 	"path"
 	"github.com/hashicorp/terraform/helper/schema"
 	"strings"
+	"syscall"
 	"github.com/hashicorp/terraform/terraform"
 )
 
@@ -151,6 +152,45 @@ func FileUpdate(d *schema.ResourceData, meta interface{}) error {
 	return nil
 }
 func FileDelete(d *schema.ResourceData, meta interface{}) error {
+	splits := strings.SplitN(d.Id(), " ", 3)
+	repo := splits[0]
+	branch := splits[1]
+	filepath := splits[2]
+	workdir := meta.(*gitfileConfig).workDir
+	checkout_dir := path.Join(workdir, mungeGitDir(d.Id()))
+	commit_message := d.Get("commit_message").(string)
+
+	git_rm := exec.Command("git", "rm", "--ignore-unmatch", "--", filepath)
+	git_rm.Dir = checkout_dir
+	if err := git_rm.Run(); err != nil {
+		return err
+	}
+
+	git_diff_index := exec.Command("git", "diff-index", "--exit-code", "--quiet", "HEAD", "--", filepath)
+	git_diff_index.Dir = checkout_dir
+	if err := git_diff_index.Run(); err != nil {
+		exitErr, isExitErr := err.(*exec.ExitError)
+		if isExitErr {
+			if exitErr.Sys().(syscall.WaitStatus).ExitStatus() != 1 {
+				return err
+			} else {
+				git_commit := exec.Command("git", "commit", "-m", commit_message, "--", filepath)
+				git_commit.Dir = checkout_dir
+				if err := git_commit.Run(); err != nil {
+					return err
+				}
+
+				git_push := exec.Command("git", "push", repo, fmt.Sprintf("HEAD:%s", branch))
+				git_push.Dir = checkout_dir
+				if err := git_push.Run(); err != nil {
+					return err
+				}
+			}
+		} else {
+			return err
+		}
+	}
+
 	return nil
 }
 
