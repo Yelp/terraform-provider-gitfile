@@ -308,6 +308,10 @@ func CommitCreate(d *schema.ResourceData, meta interface{}) error {
 		return err
 	}
 
+	if _, err := gitCommand(checkout_dir, "push", "origin", "HEAD"); err != nil {
+		return err
+	}
+
 	if out, err := gitCommand(checkout_dir, "rev-parse", "HEAD"); err != nil {
 		return err
 	} else {
