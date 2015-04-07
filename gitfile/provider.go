@@ -2,6 +2,7 @@ package gitfile
 
 import (
 	b64 "encoding/base64"
+	"github.com/hashicorp/errwrap"
 	"os/exec"
 	"fmt"
 	"github.com/hashicorp/terraform/helper/hashcode"
@@ -30,6 +31,8 @@ func Provider() terraform.ResourceProvider {
 			},
 		},
 		ResourcesMap: map[string]*schema.Resource{
+			"gitfile_checkout": checkoutResource(),
+			"gitfile_file": fileResource(),
 			"gitfile_commit": commitResource(),
 		},
 		ConfigureFunc: gitfileConfigure,
@@ -49,10 +52,52 @@ type gitfileConfig struct {
 	bogusFilename string
 }
 
-
-func commitResource() *schema.Resource {
+func fileResource() *schema.Resource {
 	return &schema.Resource {
-		Schema: map[string]*schema.Schema {
+		Schema: map[string]*schema.Schema{
+			"path": &schema.Schema{
+				Type: schema.TypeString,
+				Required: true,
+			},
+			"contents": &schema.Schema{
+				Type: schema.TypeString,
+				Required: true,
+			},
+			"checkout_dir": &schema.Schema{
+				Type: schema.TypeString,
+				Required: true,
+			},
+		},
+		Create: FileCreate,
+		Read: FileRead,
+		Update: FileUpdate,
+		Delete: FileDelete,
+	}
+}
+
+func FileCreate(d *schema.ResourceData, meta interface{}) error {
+	return nil
+}
+
+func FileRead(d *schema.ResourceData, meta interface{}) error {
+	return nil
+}
+
+func FileUpdate(d *schema.ResourceData, meta interface{}) error {
+	return nil
+}
+
+func FileDelete(d *schema.ResourceData, meta interface{}) error {
+	return nil
+}
+
+func checkoutResource() *schema.Resource {
+	return &schema.Resource {
+		Schema: map[string]*schema.Schema{
+			"path": &schema.Schema{
+				Type: schema.TypeString,
+				Optional: true,
+			},
 			"repo": &schema.Schema{
 				Type: schema.TypeString,
 				Required: true,
@@ -62,34 +107,174 @@ func commitResource() *schema.Resource {
 				Optional: true,
 				Default: "master",
 			},
+			"head": &schema.Schema{
+				Type: schema.TypeString,
+				Computed: true,
+			},
+		},
+		Create: CheckoutCreate,
+		Read: CheckoutRead,
+		Update: nil,
+		Delete: CheckoutDelete,
+	}
+}
+
+func CheckoutCreate(d *schema.ResourceData, meta interface{}) error {
+	checkout_dir := d.Get("path").(string)
+	repo := d.Get("repo").(string)
+	branch := d.Get("branch").(string)
+
+	if err := os.MkdirAll(checkout_dir, 0755); err != nil {
+		return err
+	}
+
+	if _, err := gitCommand(checkout_dir, "clone", "-b", branch, "--", repo, "."); err != nil {
+		return err
+	}
+	var head string
+	if out, err := gitCommand(checkout_dir, "rev-parse", "HEAD"); err != nil {
+		return err
+	} else {
+		head = strings.TrimRight(string(out), "\n")
+	}
+
+	d.Set("head", head)
+	d.SetId(checkout_dir)
+	return nil
+}
+
+func CheckoutRead(d *schema.ResourceData, meta interface{}) error {
+	checkout_dir := d.Id()
+	var repo string
+	var branch string
+	var head string
+
+	if out, err := gitCommand(checkout_dir, "config", "--get", "remote.origin.url"); err != nil {
+		return err
+	} else {
+		repo = strings.TrimRight(string(out), "\n")
+	}
+	if out, err := gitCommand(checkout_dir, "rev-parse", "--abbrev-ref", "HEAD"); err != nil {
+		return err
+	} else {
+		branch = strings.TrimRight(string(out), "\n")
+	}
+
+	if _, err := gitCommand(checkout_dir, "pull", "--ff-only", "origin"); err != nil {
+		return err
+	}
+
+	if out, err := gitCommand(checkout_dir, "rev-parse", "HEAD"); err != nil {
+		return err
+	} else {
+		head = strings.TrimRight(string(out), "\n")
+	}
+
+	d.Set("path", checkout_dir)
+	d.Set("repo", repo)
+	d.Set("branch", branch)
+	d.Set("head", head)
+	return nil
+}
+
+func CheckoutDelete(d *schema.ResourceData, meta interface{}) error {
+	checkout_dir := d.Id()
+	expected_repo := d.Get("repo").(string)
+	expected_branch := d.Get("branch").(string)
+	expected_head := d.Get("head").(string)
+
+	// sanity check
+	var repo string
+	var branch string
+	var head string
+
+	if out, err := gitCommand(checkout_dir, "config", "--get", "remote.origin.url"); err != nil {
+		return err
+	} else {
+		repo = strings.TrimRight(string(out), "\n")
+	}
+	if out, err := gitCommand(checkout_dir, "rev-parse", "--abbrev-ref", "HEAD"); err != nil {
+		return err
+	} else {
+		branch = strings.TrimRight(string(out), "\n")
+	}
+
+	if _, err := gitCommand(checkout_dir, "pull", "--ff-only", "origin"); err != nil {
+		return err
+	}
+
+	if out, err := gitCommand(checkout_dir, "rev-parse", "HEAD"); err != nil {
+		return err
+	} else {
+		head = strings.TrimRight(string(out), "\n")
+	}
+
+	if expected_repo != repo {
+		return fmt.Errorf("expected repo to be %s, was %s", expected_repo, repo)
+	}
+	if expected_branch != branch {
+		return fmt.Errorf("expected branch to be %s, was %s", expected_branch, branch)
+	}
+	if expected_head != head {
+		return fmt.Errorf("expected head to be %s, was %s", expected_head, head)
+	}
+
+	// more sanity checks
+	if out, err := gitCommand(checkout_dir, "clean", "-dn"); err != nil {
+		return err
+	} else {
+		if out != nil && string(out) != "" {
+			return fmt.Errorf("Refusing to delete checkout %s with untracked files: %s", checkout_dir, string(out))
+		}
+	}
+	if out, err := gitCommand(checkout_dir, "diff-index", "--exit-code", "HEAD"); err != nil {
+		exitErr, isExitErr := err.(*exec.ExitError)
+		if isExitErr {
+			if exitErr.Sys().(syscall.WaitStatus).ExitStatus() != 1 {
+				return err
+			} else {
+				return fmt.Errorf("Refusing to delete dirty checkout %s: %s", checkout_dir, string(out))
+			}
+		} else {
+			return err
+		}
+	}
+
+	// actually delete
+	if err := os.RemoveAll(checkout_dir); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+
+func commitResource() *schema.Resource {
+	return &schema.Resource {
+		Schema: map[string]*schema.Schema {
 			"commit_message": &schema.Schema{
 				Type: schema.TypeString,
 				Optional: true,
 				Default: "Created by terraform gitfile_commit",
 			},
-			"file": &schema.Schema {
+			"paths": &schema.Schema {
 				Type: schema.TypeSet,
 				Required: true,
-				Set: hashFile,
-				Elem: &schema.Resource{
-					Schema: map[string]*schema.Schema{
-						"path": &schema.Schema{
-							Type: schema.TypeString,
-							Required: true,
-						},
-						"contents": &schema.Schema{
-							Type: schema.TypeString,
-							Required: true,
-						},
-					},
+				Set: hashString,
+				Elem: &schema.Schema{
+					Type: schema.TypeString,
 				},
 			},
 		},
-		Create: FileCreate,
-		Read: FileRead,
-		Update: FileUpdate,
-		Delete: FileDelete,
+		Create: CommitCreate,
+		Read: CommitRead,
+		Update: CommitUpdate,
+		Delete: CommitDelete,
 	}
+}
+
+func hashString(v interface{}) int {
+	return hashcode.String(v.(string))
 }
 
 func hashFile(v interface{}) int {
@@ -126,7 +311,7 @@ func getFileMap(d *schema.ResourceData) map[string]map[string]interface{} {
 	return ret
 }
 
-func FileCreate(d *schema.ResourceData, meta interface{}) error {
+func CommitCreate(d *schema.ResourceData, meta interface{}) error {
 	repo := d.Get("repo").(string)
 	branch := d.Get("branch").(string)
 	commit_message := d.Get("commit_message").(string)
@@ -165,7 +350,7 @@ func FileCreate(d *schema.ResourceData, meta interface{}) error {
 
 	return nil
 }
-func FileRead(d *schema.ResourceData, meta interface{}) error {
+func CommitRead(d *schema.ResourceData, meta interface{}) error {
 	splits := strings.SplitN(d.Id(), " ", 3)
 	repo := splits[0]
 	branch := splits[1]
@@ -207,7 +392,7 @@ func FileRead(d *schema.ResourceData, meta interface{}) error {
 	d.Set("file", files)
 	return nil
 }
-func FileUpdate(d *schema.ResourceData, meta interface{}) error {
+func CommitUpdate(d *schema.ResourceData, meta interface{}) error {
 	repo := d.Get("repo").(string)
 	branch := d.Get("branch").(string)
 	commit_message := d.Get("commit_message").(string)
@@ -258,7 +443,7 @@ func FileUpdate(d *schema.ResourceData, meta interface{}) error {
 
 	return nil
 }
-func FileDelete(d *schema.ResourceData, meta interface{}) error {
+func CommitDelete(d *schema.ResourceData, meta interface{}) error {
 	splits := strings.SplitN(d.Id(), " ", 3)
 	repo := splits[0]
 	branch := splits[1]
@@ -296,8 +481,12 @@ func FileDelete(d *schema.ResourceData, meta interface{}) error {
 func gitCommand(checkout_dir string, args ...string) ([]byte, error) {
 	command := exec.Command("git", args...)
 	command.Dir = checkout_dir
-	out, err := command.Output()
-	return out, err
+	out, err := command.CombinedOutput()
+	if err != nil {
+		return out, errwrap.Wrapf(fmt.Sprintf("Error while running git %s: {{err}}\nWorking dir: %s\nOutput: %s", strings.Join(args, " "), checkout_dir, string(out)), err)
+	} else {
+		return out, err
+	}
 }
 
 func flatten(args ...interface{}) []string {
