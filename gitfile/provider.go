@@ -20,15 +20,6 @@ func Provider() terraform.ResourceProvider {
 	file_resource := fileResource()
 	return &schema.Provider{
 		Schema: map[string]*schema.Schema{
-			"workdir": &schema.Schema{
-				Type: schema.TypeString,
-				Required: true,
-			},
-			"bogus_filename": &schema.Schema{
-				Type: schema.TypeString,
-				Optional: true,
-				Default: ".gitignore",
-			},
 		},
 		ResourcesMap: map[string]*schema.Resource{
 			"gitfile_checkout": checkoutResource(),
@@ -40,15 +31,11 @@ func Provider() terraform.ResourceProvider {
 
 func gitfileConfigure(data *schema.ResourceData) (interface{}, error) {
 	config := &gitfileConfig {
-		workDir: data.Get("workdir").(string),
-		bogusFilename: data.Get("bogus_filename").(string),
 	}
 	return config, nil
 }
 
 type gitfileConfig struct {
-	workDir string
-	bogusFilename string
 }
 
 func fileResource() *schema.Resource {
