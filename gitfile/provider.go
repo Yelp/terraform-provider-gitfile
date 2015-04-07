@@ -68,26 +68,53 @@ func fileResource() *schema.Resource {
 				Required: true,
 			},
 		},
-		Create: FileCreate,
+		Create: FileCreateUpdate,
 		Read: FileRead,
-		Update: FileUpdate,
+		Update: FileCreateUpdate,
 		Delete: FileDelete,
 	}
 }
 
-func FileCreate(d *schema.ResourceData, meta interface{}) error {
+func FileCreateUpdate(d *schema.ResourceData, meta interface{}) error {
+	filepath := d.Get("path").(string)
+	contents := d.Get("contents").(string)
+	checkout_dir := d.Get("checkout_dir").(string)
+
+	if id_bytes, err := json.Marshal([]string{checkout_dir, filepath}); err != nil {
+		return err
+	} else {
+		d.SetId(string(id_bytes))
+	}
+
+	if err := ioutil.WriteFile(path.Join(checkout_dir, filepath), []byte(contents), 0666); err != nil {
+		return err
+	}
+
 	return nil
 }
 
 func FileRead(d *schema.ResourceData, meta interface{}) error {
-	return nil
-}
+	list := []string{}
+	if err := json.Unmarshal([]byte(d.Id()), &list); err != nil {
+		return err
+	}
+	checkout_dir := list[0]
+	filepath := list[1]
 
-func FileUpdate(d *schema.ResourceData, meta interface{}) error {
+	d.Set("checkout_dir", checkout_dir)
+	d.Set("path", filepath)
+
+	if content_bytes, err := ioutil.ReadFile(path.Join(checkout_dir, filepath)); err != nil {
+		return err
+	} else {
+		d.Set("contents", string(content_bytes))
+	}
+
 	return nil
 }
 
 func FileDelete(d *schema.ResourceData, meta interface{}) error {
+	// Currently not managing deletes with this. Will make a gitfile_purgedir resource later.
 	return nil
 }
 
