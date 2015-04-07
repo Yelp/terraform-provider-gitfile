@@ -1,14 +1,11 @@
 package gitfile
 
 import (
-	b64 "encoding/base64"
 	"github.com/hashicorp/errwrap"
 	"os/exec"
 	"fmt"
 	"github.com/hashicorp/terraform/helper/hashcode"
 	"io/ioutil"
-	"encoding/json"
-	"log"
 	"os"
 	"path"
 	"github.com/hashicorp/terraform/helper/schema"
@@ -17,7 +14,10 @@ import (
 	"github.com/hashicorp/terraform/terraform"
 )
 
+const CommitBodyHeader string = "The following files are managed by terraform:"
+
 func Provider() terraform.ResourceProvider {
+	file_resource := fileResource()
 	return &schema.Provider{
 		Schema: map[string]*schema.Schema{
 			"workdir": &schema.Schema{
@@ -32,8 +32,7 @@ func Provider() terraform.ResourceProvider {
 		},
 		ResourcesMap: map[string]*schema.Resource{
 			"gitfile_checkout": checkoutResource(),
-			"gitfile_file": fileResource(),
-			"gitfile_commit": commitResource(),
+			"gitfile_commit": commitResource(file_resource),
 		},
 		ConfigureFunc: gitfileConfigure,
 	}
@@ -63,29 +62,11 @@ func fileResource() *schema.Resource {
 				Type: schema.TypeString,
 				Required: true,
 			},
-			"checkout_dir": &schema.Schema{
-				Type: schema.TypeString,
-				Required: true,
-			},
 		},
-		Create: FileCreateUpdate,
-		Read: FileRead,
-		Update: FileCreateUpdate,
-		Delete: FileDelete,
 	}
 }
 
-func FileCreateUpdate(d *schema.ResourceData, meta interface{}) error {
-	filepath := d.Get("path").(string)
-	contents := d.Get("contents").(string)
-	checkout_dir := d.Get("checkout_dir").(string)
-
-	if id_bytes, err := json.Marshal([]string{checkout_dir, filepath}); err != nil {
-		return err
-	} else {
-		d.SetId(string(id_bytes))
-	}
-
+func fileCreateUpdate(checkout_dir, filepath, contents string) error {
 	if err := ioutil.WriteFile(path.Join(checkout_dir, filepath), []byte(contents), 0666); err != nil {
 		return err
 	}
@@ -93,29 +74,17 @@ func FileCreateUpdate(d *schema.ResourceData, meta interface{}) error {
 	return nil
 }
 
-func FileRead(d *schema.ResourceData, meta interface{}) error {
-	list := []string{}
-	if err := json.Unmarshal([]byte(d.Id()), &list); err != nil {
-		return err
-	}
-	checkout_dir := list[0]
-	filepath := list[1]
-
-	d.Set("checkout_dir", checkout_dir)
-	d.Set("path", filepath)
-
+func fileRead(checkout_dir, filepath string) (map[string]interface{}, error) {
 	if content_bytes, err := ioutil.ReadFile(path.Join(checkout_dir, filepath)); err != nil {
-		return err
+		return nil, err
 	} else {
-		d.Set("contents", string(content_bytes))
+		return map[string]interface{}{
+			"contents": string(content_bytes),
+			"path": filepath,
+		}, nil
 	}
 
-	return nil
-}
-
-func FileDelete(d *schema.ResourceData, meta interface{}) error {
-	// Currently not managing deletes with this. Will make a gitfile_purgedir resource later.
-	return nil
+	return nil, nil
 }
 
 func checkoutResource() *schema.Resource {
@@ -276,7 +245,7 @@ func CheckoutDelete(d *schema.ResourceData, meta interface{}) error {
 }
 
 
-func commitResource() *schema.Resource {
+func commitResource(file_resource *schema.Resource) *schema.Resource {
 	return &schema.Resource {
 		Schema: map[string]*schema.Schema {
 			"commit_message": &schema.Schema{
@@ -284,25 +253,133 @@ func commitResource() *schema.Resource {
 				Optional: true,
 				Default: "Created by terraform gitfile_commit",
 			},
-			"paths": &schema.Schema {
+			"checkout_dir": &schema.Schema {
+				Type: schema.TypeString,
+				Required: true,
+				ForceNew: true,
+			},
+			"file": &schema.Schema {
 				Type: schema.TypeSet,
 				Required: true,
-				Set: hashString,
-				Elem: &schema.Schema{
-					Type: schema.TypeString,
-				},
+				Set: hashFile,
+				Elem: file_resource,
 			},
 		},
 		Create: CommitCreate,
 		Read: CommitRead,
-		Update: CommitUpdate,
+		Update: CommitCreate,
 		Delete: CommitDelete,
 	}
 }
 
-func hashString(v interface{}) int {
-	return hashcode.String(v.(string))
+func CommitCreate(d *schema.ResourceData, meta interface{}) error {
+	checkout_dir := d.Get("checkout_dir").(string)
+	files := d.Get("file").(*schema.Set)
+	commit_message := d.Get("commit_message").(string)
+	filepaths := []string{}
+	filepaths_to_commit := []string{}
+	for _, file := range files.List() {
+		filepath := file.(map[string]interface{})["path"].(string)
+		filepaths = append(filepaths, filepath)
+
+		if existing_content_bytes, err := ioutil.ReadFile(path.Join(checkout_dir, filepath)); err != nil && !os.IsNotExist(err) {
+			return err;
+		} else {
+			contents := file.(map[string]interface{})["contents"].(string)
+			// we only want to git add/git commit if we've changed this file
+			// so if it existed before (err == nil) and the contents are the same
+			// then don't bother.
+			if !(err == nil && contents == string(existing_content_bytes)) {
+				filepaths_to_commit = append(filepaths_to_commit, filepath)
+			}
+			if err := fileCreateUpdate(checkout_dir, filepath, contents); err != nil {
+				return err
+			}
+		}
+	}
+
+	var sha string
+	if _, err := gitCommand(checkout_dir, flatten("add", "--", filepaths_to_commit)...); err != nil {
+		return err
+	}
+
+	commit_body := fmt.Sprintf("%s\n%s", CommitBodyHeader, strings.Join(filepaths, "\n"))
+	if _, err := gitCommand(checkout_dir, flatten("commit", "-m", commit_message, "-m", commit_body, "--allow-empty", "--", filepaths_to_commit)...); err != nil {
+		return err
+	}
+
+	if out, err := gitCommand(checkout_dir, "rev-parse", "HEAD"); err != nil {
+		return err
+	} else {
+		sha = strings.TrimRight(string(out), "\n")
+	}
+
+	d.SetId(fmt.Sprintf("%s %s", sha, checkout_dir))
+	return nil
 }
+
+func getFilePathsFromCommit(checkout_dir, sha string) ([]string, error) {
+	filepaths := []string{}
+
+	if out, err := gitCommand(checkout_dir, "show", "-s", "--format=%b", sha); err != nil {
+		return nil, err
+	} else {
+		for i, filepath := range strings.Split(string(out), "\n") {
+			if i == 0 {
+				if filepath != CommitBodyHeader {
+					return nil, fmt.Errorf("Expected body of commit to contain %v, got %v", CommitBodyHeader, filepath)
+				}
+			} else {
+				if filepath != "" {
+					filepaths = append(filepaths, filepath)
+				}
+			}
+		}
+	}
+	return filepaths, nil
+}
+
+func CommitRead(d *schema.ResourceData, meta interface{}) error {
+	list := strings.SplitN(d.Id(), " ", 2)
+
+	sha := list[0]
+	checkout_dir := list[1]
+	var filepaths []string
+	if _filepaths, err := getFilePathsFromCommit(checkout_dir, sha); err != nil {
+		return err
+	} else {
+		filepaths = _filepaths
+	}
+
+	d.Set("checkout_dir", checkout_dir)
+	d.Set("sha", sha)
+
+	files := []map[string]interface{}{}
+	for _, filepath := range filepaths {
+		if filedata, err := fileRead(checkout_dir, filepath); err != nil {
+			return err
+		} else {
+			files = append(files, filedata)
+		}
+	}
+	d.Set("file", files)
+
+
+	commit_message := ""
+	if out, err := gitCommand(checkout_dir, "show", "-s", "--format=%s", sha); err != nil {
+		return err
+	} else {
+		commit_message = strings.TrimRight(string(out), "\n")
+	}
+	d.Set("commit_message", commit_message)
+
+	return nil
+}
+
+func CommitDelete(d *schema.ResourceData, meta interface{}) error {
+	return nil
+}
+
 
 func hashFile(v interface{}) int {
 	switch v := v.(type) {
@@ -314,195 +391,6 @@ func hashFile(v interface{}) int {
 		return hashcode.String(v["path"].(string))
 	}
 	return -1
-}
-
-func getFilePaths(d *schema.ResourceData) []string {
-	files := d.Get("file").(*schema.Set)
-	filepaths := make([]string, files.Len())
-	i := 0
-	for _, file := range files.List() {
-		filepaths[i] = file.(map[string]interface{})["path"].(string)
-		i = i + 1
-	}
-	log.Printf("RCHOEURHOEURCHOEURCHOEURCHOEU %#v", files)
-	return filepaths
-}
-
-func getFileMap(d *schema.ResourceData) map[string]map[string]interface{} {
-	files := d.Get("file").(*schema.Set)
-	ret := make(map[string]map[string]interface{})
-	for _, fd := range files.List() {
-		file := fd.(map[string]interface{})
-		ret[file["path"].(string)] = file
-	}
-	return ret
-}
-
-func CommitCreate(d *schema.ResourceData, meta interface{}) error {
-	repo := d.Get("repo").(string)
-	branch := d.Get("branch").(string)
-	commit_message := d.Get("commit_message").(string)
-	bogus_file_name := meta.(*gitfileConfig).bogusFilename
-	workdir := meta.(*gitfileConfig).workDir
-
-	checkout_dir := path.Join(workdir, mungeGitDir(d.Id()))
-
-	if err := shallowSparseGitCheckout(checkout_dir, repo, branch, bogus_file_name, getFilePaths(d)); err != nil {
-	        return err
-	}
-
-	for filepath, filedict := range getFileMap(d) {
-		if _, err := gitCommand(checkout_dir, "add", "--intent-to-add", "--", filepath); err != nil {
-			return err
-		}
-
-		if err := ioutil.WriteFile(path.Join(checkout_dir, filepath), []byte(filedict["contents"].(string)), 0666); err != nil {
-			return err
-		}
-	}
-
-	if _, err := gitCommand(checkout_dir, flatten("commit", "-m", commit_message, "--", getFilePaths(d))...); err != nil {
-		return err
-	}
-
-	if _, err := gitCommand(checkout_dir, "push", repo, fmt.Sprintf("HEAD:%s", branch)); err != nil {
-		return err
-	}
-
-	fileListJson, err := json.Marshal(getFilePaths(d))
-	if err != nil {
-		return err
-	}
-	d.SetId(fmt.Sprintf("%s %s %s", repo, branch, string(fileListJson)))
-
-	return nil
-}
-func CommitRead(d *schema.ResourceData, meta interface{}) error {
-	splits := strings.SplitN(d.Id(), " ", 3)
-	repo := splits[0]
-	branch := splits[1]
-	fileListJson := splits[2]
-
-	workdir := meta.(*gitfileConfig).workDir
-	bogus_file_name := meta.(*gitfileConfig).bogusFilename
-
-	d.Set("repo", repo)
-	d.Set("branch", branch)
-	files := schema.NewSet(hashFile, []interface{}{})
-	filelist := []string{}
-	if err := json.Unmarshal([]byte(fileListJson), &filelist); err != nil {
-		return err
-	}
-
-	checkout_dir := path.Join(workdir, mungeGitDir(d.Id()))
-	if err := shallowSparseGitCheckout(checkout_dir, repo, branch, bogus_file_name, filelist); err != nil {
-		return err
-	}
-
-	for _, filepath := range filelist {
-		if filepath != "" {
-			filedict := make(map[string]string)
-			filedict["path"] = filepath
-			contents, err := ioutil.ReadFile(path.Join(checkout_dir, filepath))
-			if err != nil {
-				if os.IsNotExist(err) {
-					filedict["contents"] = ""
-				} else {
-					return err
-				}
-			} else {
-				filedict["contents"] = string(contents)
-			}
-			files.Add(filedict)
-		}
-	}
-	d.Set("file", files)
-	return nil
-}
-func CommitUpdate(d *schema.ResourceData, meta interface{}) error {
-	repo := d.Get("repo").(string)
-	branch := d.Get("branch").(string)
-	commit_message := d.Get("commit_message").(string)
-	bogus_file_name := meta.(*gitfileConfig).bogusFilename
-	workdir := meta.(*gitfileConfig).workDir
-
-	checkout_dir := path.Join(workdir, mungeGitDir(d.Id()))
-
-	splits := strings.SplitN(d.Id(), " ", 3)
-	fileListJson := []byte(splits[2])
-	filelist := []string{}
-	if err := json.Unmarshal([]byte(fileListJson), &filelist); err != nil {
-		return err
-	}
-
-	if err := shallowSparseGitCheckout(checkout_dir, repo, branch, bogus_file_name, flatten(getFilePaths(d), filelist)); err != nil {
-	        return err
-	}
-
-	for _, filepath := range filelist {
-		if _, err := gitCommand(checkout_dir, "rm", "--", filepath); err != nil {
-			return err
-		}
-	}
-	for filepath, filedict := range getFileMap(d) {
-		if _, err := gitCommand(checkout_dir, "add", "--intent-to-add", "--", filepath); err != nil {
-			return err
-		}
-
-		if err := ioutil.WriteFile(path.Join(checkout_dir, filepath), []byte(filedict["contents"].(string)), 0666); err != nil {
-			return err
-		}
-	}
-
-	if _, err := gitCommand(checkout_dir, flatten("commit", "-m", commit_message, "--", getFilePaths(d))...); err != nil {
-		return err
-	}
-
-	if _, err := gitCommand(checkout_dir, "push", repo, fmt.Sprintf("HEAD:%s", branch)); err != nil {
-		return err
-	}
-
-	fileListJson, err := json.Marshal(getFilePaths(d))
-	if err != nil {
-		return err
-	}
-	d.SetId(fmt.Sprintf("%s %s %s", repo, branch, string(fileListJson)))
-
-	return nil
-}
-func CommitDelete(d *schema.ResourceData, meta interface{}) error {
-	splits := strings.SplitN(d.Id(), " ", 3)
-	repo := splits[0]
-	branch := splits[1]
-
-	workdir := meta.(*gitfileConfig).workDir
-	checkout_dir := path.Join(workdir, mungeGitDir(d.Id()))
-	commit_message := d.Get("commit_message").(string)
-
-	if _, err := gitCommand(checkout_dir, flatten("rm", "--ignore-unmatch", "--", getFilePaths(d))...); err != nil {
-		return err
-	}
-
-	if _, err := gitCommand(checkout_dir, flatten("diff-index", "--exit-code", "--quiet", "HEAD", "--", getFilePaths(d))...); err != nil {
-		exitErr, isExitErr := err.(*exec.ExitError)
-		if isExitErr {
-			if exitErr.Sys().(syscall.WaitStatus).ExitStatus() != 1 {
-				return err
-			} else {
-				if _, err := gitCommand(checkout_dir, flatten("commit", "-m", commit_message, "--", getFilePaths(d))...); err != nil {
-					return err
-				}
-
-				if _, err := gitCommand(checkout_dir, "push", repo, fmt.Sprintf("HEAD:%s", branch)); err != nil {
-					return err
-				}
-			}
-		} else {
-			return err
-		}
-	}
-
-	return nil
 }
 
 func gitCommand(checkout_dir string, args ...string) ([]byte, error) {
@@ -533,58 +421,3 @@ func flatten(args ...interface{}) []string {
 	return ret
 }
 
-func mungeGitDir(id string) string {
-	return b64.URLEncoding.EncodeToString([]byte(id))
-}
-
-func shallowSparseGitCheckout(checkout_dir, repo, branch, bogus_file_name string, filepaths []string) error {
-	if err := os.MkdirAll(checkout_dir, 0755); err != nil {
-		return err
-	}
-
-	// git init appears to be idempotent.
-	if _, err := gitCommand(checkout_dir, "init"); err != nil {
-		return err
-	}
-
-	if _, err := gitCommand(checkout_dir, "config", "core.sparsecheckout", "true"); err != nil {
-		return err
-	}
-
-	if err := ioutil.WriteFile(
-		path.Join(checkout_dir, ".git", "info", "sparse-checkout"),
-		[]byte(fmt.Sprintf("%s\n%s", bogus_file_name, strings.Join(filepaths, "\n"))),
-		0666,
-	); err != nil {
-		return err
-	}
-
-	// if _, err := gitCommand(checkout_dir, "fetch", "--depth", "1", repo, branch); err != nil {
-	if _, err := gitCommand(checkout_dir, "fetch", repo, branch); err != nil {
-		return err
-	}
-
-	// I would have done "git checkout --force FETCH_HEAD" here, but if none of the files in filepaths
-	// exist, then git fails with "error: Sparse checkout leaves no entry on working directory".
-	// This set of steps works around that.
-	if _, err := gitCommand(checkout_dir, "reset", "--soft", "FETCH_HEAD"); err != nil {
-		return err
-	}
-
-	// doesn't matter that Create will truncate the file here; the read-tree command later will undo changes.
-	if file, err := os.Create(path.Join(checkout_dir, bogus_file_name)); err != nil {
-		return err
-	} else {
-		file.Close()
-	}
-
-	if _, err := gitCommand(checkout_dir, "add", bogus_file_name); err != nil {
-		return err
-	}
-
-	if _, err := gitCommand(checkout_dir, "read-tree", "-u", "--reset", "HEAD"); err != nil {
-		return err
-	}
-
-	return nil
-}
