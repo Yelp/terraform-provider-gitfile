@@ -1,7 +1,7 @@
 .PHONY: itest_% clean shell
 PROJECT = terraform-provider-gitfile
 
-VERSION = 0.1.1
+VERSION = 0.2
 ITERATION = yelp1
 ARCH := $(shell facter architecture)
 

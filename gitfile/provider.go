@@ -309,61 +309,7 @@ func CommitCreate(d *schema.ResourceData, meta interface{}) error {
 	return nil
 }
 
-func getFilePathsFromCommit(checkout_dir, sha string) ([]string, error) {
-	filepaths := []string{}
-
-	if out, err := gitCommand(checkout_dir, "show", "-s", "--format=%b", sha); err != nil {
-		return nil, err
-	} else {
-		for i, filepath := range strings.Split(string(out), "\n") {
-			if i == 0 {
-				if filepath != CommitBodyHeader {
-					return nil, fmt.Errorf("Expected body of commit to contain %v, got %v", CommitBodyHeader, filepath)
-				}
-			} else {
-				if filepath != "" {
-					filepaths = append(filepaths, filepath)
-				}
-			}
-		}
-	}
-	return filepaths, nil
-}
-
 func CommitRead(d *schema.ResourceData, meta interface{}) error {
-	list := strings.SplitN(d.Id(), " ", 2)
-
-	sha := list[0]
-	checkout_dir := list[1]
-	var filepaths []string
-	if _filepaths, err := getFilePathsFromCommit(checkout_dir, sha); err != nil {
-		return err
-	} else {
-		filepaths = _filepaths
-	}
-
-	d.Set("checkout_dir", checkout_dir)
-	d.Set("sha", sha)
-
-	files := []map[string]interface{}{}
-	for _, filepath := range filepaths {
-		if filedata, err := fileRead(checkout_dir, filepath); err != nil {
-			return err
-		} else {
-			files = append(files, filedata)
-		}
-	}
-	d.Set("file", files)
-
-
-	commit_message := ""
-	if out, err := gitCommand(checkout_dir, "show", "-s", "--format=%s", sha); err != nil {
-		return err
-	} else {
-		commit_message = strings.TrimRight(string(out), "\n")
-	}
-	d.Set("commit_message", commit_message)
-
 	return nil
 }
 
