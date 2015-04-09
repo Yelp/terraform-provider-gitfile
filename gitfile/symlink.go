@@ -1,13 +1,12 @@
 package gitfile
 
 import (
-	"io/ioutil"
 	"os"
 	"path"
 	"github.com/hashicorp/terraform/helper/schema"
 )
 
-func fileResource() *schema.Resource {
+func symlinkResource() *schema.Resource {
 	return &schema.Resource {
 		Schema: map[string]*schema.Schema{
 			"checkout_dir": &schema.Schema{
@@ -20,29 +19,32 @@ func fileResource() *schema.Resource {
 				Required: true,
 				ForceNew: true,
 			},
-			"contents": &schema.Schema{
+			"target": &schema.Schema{
 				Type: schema.TypeString,
 				Required: true,
 				ForceNew: true,
 			},
 		},
-		Create: fileCreateUpdate,
-		Read: fileRead,
-		Update: fileCreateUpdate,
-		Delete: fileDelete,
-		Exists: fileExists,
+		Create: symlinkCreateUpdate,
+		Read: symlinkRead,
+		Update: symlinkCreateUpdate,
+		Delete: symlinkDelete,
+		Exists: symlinkExists,
 	}
 }
 
-func fileCreateUpdate(d *schema.ResourceData, meta interface{}) error {
+func symlinkCreateUpdate(d *schema.ResourceData, meta interface{}) error {
 	checkout_dir := d.Get("checkout_dir").(string)
 	lockCheckout(checkout_dir)
 	defer unlockCheckout(checkout_dir)
 
 	filepath := d.Get("path").(string)
-	contents := d.Get("contents").(string)
+	target := d.Get("target").(string)
 
-	if err := ioutil.WriteFile(path.Join(checkout_dir, filepath), []byte(contents), 0666); err != nil {
+	if err := os.Remove(path.Join(checkout_dir, filepath)); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	if err := os.Symlink(target, path.Join(checkout_dir, filepath)); err != nil {
 		return err
 	}
 
@@ -51,8 +53,8 @@ func fileCreateUpdate(d *schema.ResourceData, meta interface{}) error {
 	}
 
 	hand := handle{
-		kind: "file",
-		hash: hashString(contents),
+		kind: "symlink",
+		hash: hashString(target),
 		path: filepath,
 	}
 
@@ -60,32 +62,32 @@ func fileCreateUpdate(d *schema.ResourceData, meta interface{}) error {
 	return nil
 }
 
-func fileRead(d *schema.ResourceData, meta interface{}) error {
+func symlinkRead(d *schema.ResourceData, meta interface{}) error {
 	return nil
 }
 
-func fileExists(d *schema.ResourceData, meta interface{}) (bool, error) {
+func symlinkExists(d *schema.ResourceData, meta interface{}) (bool, error) {
 	checkout_dir := d.Get("checkout_dir").(string)
 	lockCheckout(checkout_dir)
 	defer unlockCheckout(checkout_dir)
 	filepath := d.Get("path").(string)
-
-	var out []byte
+	var target string
 	var err error
-	if out, err = ioutil.ReadFile(path.Join(checkout_dir, filepath)); err != nil {
+	if target, err = os.Readlink(path.Join(checkout_dir, filepath)); err != nil {
 		if os.IsNotExist(err) {
 			return false, nil
 		} else {
 			return false, err
 		}
 	}
-	if string(out) == d.Get("contents").(string) {
+
+	if target == d.Get("target").(string) {
 		return true, nil
 	} else {
 		return false, nil
 	}
 }
 
-func fileDelete(d *schema.ResourceData, meta interface{}) error {
+func symlinkDelete(d *schema.ResourceData, meta interface{}) error {
 	return nil
 }

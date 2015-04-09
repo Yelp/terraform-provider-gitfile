@@ -11,6 +11,7 @@ func Provider() terraform.ResourceProvider {
 		ResourcesMap: map[string]*schema.Resource{
 			"gitfile_checkout": checkoutResource(),
 			"gitfile_file": fileResource(),
+			"gitfile_symlink": symlinkResource(),
 			"gitfile_commit": commitResource(),
 		},
 		ConfigureFunc: gitfileConfigure,
