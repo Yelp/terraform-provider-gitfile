@@ -1,6 +1,6 @@
-.PHONY: all fmt clean package test itest_%
+.PHONY: all fmt .git/hooks/pre-commit clean package test itest_%
 
-all: fmt test
+all: fmt .git/hooks/pre-commit test
 
 fmt:
 	go fmt ./...
@@ -15,4 +15,7 @@ package: itest_lucid
 
 test:
 	go test -v ./gitfile/...
+
+.git/hooks/pre-commit:
+	if [ ! -f .git/hooks/pre-commit ]; then ln -s ../../git-hooks/pre-commit .git/hooks/pre-commit; fi
 
