@@ -8,9 +8,13 @@ fmt:
 clean:
 	make -C yelppack clean
 	rm -f terraform-provider-gitfile
+	rm -rf test/example.git test/checkout test/terraform.tfstate.backup test/terraform.tfstate
 
 terraform-provider-gitfile:
 	go build
+
+integration:
+	make -C test
 
 itest_%:
 	make -C yelppack $@
