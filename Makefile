@@ -1,12 +1,16 @@
-.PHONY: all fmt .git/hooks/pre-commit clean package test itest_%
+.PHONY: all fmt .git/hooks/pre-commit terraform-provider-gitfile clean package test itest_%
 
-all: fmt .git/hooks/pre-commit test
+all: fmt .git/hooks/pre-commit test terraform-provider-gitfile
 
 fmt:
 	go fmt ./...
 
 clean:
 	make -C yelppack clean
+	rm -f terraform-provider-gitfile
+
+terraform-provider-gitfile:
+	go build
 
 itest_%:
 	make -C yelppack $@
