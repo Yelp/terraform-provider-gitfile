@@ -42,6 +42,7 @@ func fileResource() *schema.Resource {
 			"path": &schema.Schema{
 				Type:     schema.TypeString,
 				Required: true,
+				ForceNew: true,
 			},
 			"contents": &schema.Schema{
 				Type:     schema.TypeString,
@@ -78,15 +79,18 @@ func checkoutResource() *schema.Resource {
 			"path": &schema.Schema{
 				Type:     schema.TypeString,
 				Optional: true,
+				ForceNew: true,
 			},
 			"repo": &schema.Schema{
 				Type:     schema.TypeString,
 				Required: true,
+				ForceNew: true,
 			},
 			"branch": &schema.Schema{
 				Type:     schema.TypeString,
 				Optional: true,
 				Default:  "master",
+				ForceNew: true,
 			},
 			"head": &schema.Schema{
 				Type:     schema.TypeString,
