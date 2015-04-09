@@ -6,5 +6,5 @@ go:
   - tip
 
 script:
-  - make test
+  - make
 
