@@ -64,6 +64,9 @@ func CheckoutCreate(d *schema.ResourceData, meta interface{}) error {
 
 func CheckoutRead(d *schema.ResourceData, meta interface{}) error {
 	checkout_dir := d.Id()
+	lockCheckout(checkout_dir)
+	defer unlockCheckout(checkout_dir)
+
 	var repo string
 	var branch string
 	var head string
@@ -98,6 +101,9 @@ func CheckoutRead(d *schema.ResourceData, meta interface{}) error {
 
 func CheckoutDelete(d *schema.ResourceData, meta interface{}) error {
 	checkout_dir := d.Id()
+	lockCheckout(checkout_dir)
+	defer unlockCheckout(checkout_dir)
+
 	expected_repo := d.Get("repo").(string)
 	expected_branch := d.Get("branch").(string)
 	expected_head := d.Get("head").(string)
