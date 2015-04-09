@@ -1,17 +1,17 @@
 package gitfile
 
 import (
-	"github.com/hashicorp/errwrap"
-	"os/exec"
 	"fmt"
+	"github.com/hashicorp/errwrap"
 	"github.com/hashicorp/terraform/helper/hashcode"
+	"github.com/hashicorp/terraform/helper/schema"
+	"github.com/hashicorp/terraform/terraform"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path"
-	"github.com/hashicorp/terraform/helper/schema"
 	"strings"
 	"syscall"
-	"github.com/hashicorp/terraform/terraform"
 )
 
 const CommitBodyHeader string = "The following files are managed by terraform:"
@@ -19,19 +19,17 @@ const CommitBodyHeader string = "The following files are managed by terraform:"
 func Provider() terraform.ResourceProvider {
 	file_resource := fileResource()
 	return &schema.Provider{
-		Schema: map[string]*schema.Schema{
-		},
+		Schema: map[string]*schema.Schema{},
 		ResourcesMap: map[string]*schema.Resource{
 			"gitfile_checkout": checkoutResource(),
-			"gitfile_commit": commitResource(file_resource),
+			"gitfile_commit":   commitResource(file_resource),
 		},
 		ConfigureFunc: gitfileConfigure,
 	}
 }
 
 func gitfileConfigure(data *schema.ResourceData) (interface{}, error) {
-	config := &gitfileConfig {
-	}
+	config := &gitfileConfig{}
 	return config, nil
 }
 
@@ -39,14 +37,14 @@ type gitfileConfig struct {
 }
 
 func fileResource() *schema.Resource {
-	return &schema.Resource {
+	return &schema.Resource{
 		Schema: map[string]*schema.Schema{
 			"path": &schema.Schema{
-				Type: schema.TypeString,
+				Type:     schema.TypeString,
 				Required: true,
 			},
 			"contents": &schema.Schema{
-				Type: schema.TypeString,
+				Type:     schema.TypeString,
 				Required: true,
 			},
 		},
@@ -67,7 +65,7 @@ func fileRead(checkout_dir, filepath string) (map[string]interface{}, error) {
 	} else {
 		return map[string]interface{}{
 			"contents": string(content_bytes),
-			"path": filepath,
+			"path":     filepath,
 		}, nil
 	}
 
@@ -75,28 +73,28 @@ func fileRead(checkout_dir, filepath string) (map[string]interface{}, error) {
 }
 
 func checkoutResource() *schema.Resource {
-	return &schema.Resource {
+	return &schema.Resource{
 		Schema: map[string]*schema.Schema{
 			"path": &schema.Schema{
-				Type: schema.TypeString,
+				Type:     schema.TypeString,
 				Optional: true,
 			},
 			"repo": &schema.Schema{
-				Type: schema.TypeString,
+				Type:     schema.TypeString,
 				Required: true,
 			},
 			"branch": &schema.Schema{
-				Type: schema.TypeString,
+				Type:     schema.TypeString,
 				Optional: true,
-				Default: "master",
+				Default:  "master",
 			},
 			"head": &schema.Schema{
-				Type: schema.TypeString,
+				Type:     schema.TypeString,
 				Computed: true,
 			},
 		},
 		Create: CheckoutCreate,
-		Read: CheckoutRead,
+		Read:   CheckoutRead,
 		Update: nil,
 		Delete: CheckoutDelete,
 	}
@@ -231,29 +229,28 @@ func CheckoutDelete(d *schema.ResourceData, meta interface{}) error {
 	return nil
 }
 
-
 func commitResource(file_resource *schema.Resource) *schema.Resource {
-	return &schema.Resource {
-		Schema: map[string]*schema.Schema {
+	return &schema.Resource{
+		Schema: map[string]*schema.Schema{
 			"commit_message": &schema.Schema{
-				Type: schema.TypeString,
+				Type:     schema.TypeString,
 				Optional: true,
-				Default: "Created by terraform gitfile_commit",
+				Default:  "Created by terraform gitfile_commit",
 			},
-			"checkout_dir": &schema.Schema {
-				Type: schema.TypeString,
+			"checkout_dir": &schema.Schema{
+				Type:     schema.TypeString,
 				Required: true,
 				ForceNew: true,
 			},
-			"file": &schema.Schema {
-				Type: schema.TypeSet,
+			"file": &schema.Schema{
+				Type:     schema.TypeSet,
 				Required: true,
-				Set: hashFile,
-				Elem: file_resource,
+				Set:      hashFile,
+				Elem:     file_resource,
 			},
 		},
 		Create: CommitCreate,
-		Read: CommitRead,
+		Read:   CommitRead,
 		Update: CommitCreate,
 		Delete: CommitDelete,
 	}
@@ -270,7 +267,7 @@ func CommitCreate(d *schema.ResourceData, meta interface{}) error {
 		filepaths = append(filepaths, filepath)
 
 		if existing_content_bytes, err := ioutil.ReadFile(path.Join(checkout_dir, filepath)); err != nil && !os.IsNotExist(err) {
-			return err;
+			return err
 		} else {
 			contents := file.(map[string]interface{})["contents"].(string)
 			// we only want to git add/git commit if we've changed this file
@@ -317,7 +314,6 @@ func CommitDelete(d *schema.ResourceData, meta interface{}) error {
 	return nil
 }
 
-
 func hashFile(v interface{}) int {
 	switch v := v.(type) {
 	default:
@@ -357,4 +353,3 @@ func flatten(args ...interface{}) []string {
 
 	return ret
 }
-
