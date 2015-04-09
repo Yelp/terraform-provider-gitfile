@@ -3,8 +3,8 @@
 all: test
 
 clean:
-	rm -rf example.git checkout terraform.tfstate.backup terraform.tfstate
+	rm -rf */example.git */checkout */terraform.tfstate.backup */terraform.tfstate
 
 test: clean
-	./test.sh
+	for i in $$(find . -name test_\* -maxdepth 1 -type d); do cd $$i; ./test.sh; cd ..; done
 

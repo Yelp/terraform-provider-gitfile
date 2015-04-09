@@ -1,5 +1,5 @@
 terraform-provider-gitfile
-test/example.git
-test/checkout
-test/terraform.tfstate.backup
-test/terraform.tfstate
+test/test_*/example.git
+test/test_*/checkout
+test/test_*/terraform.tfstate.backup
+test/test_*/terraform.tfstate
