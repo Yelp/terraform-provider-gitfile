@@ -3,8 +3,7 @@
 all: fmt test
 
 fmt:
-	go fmt terraform-provider-gitfile/gitfile
-	go fmt terraform-provider-gitfile
+	go fmt ./...
 
 clean:
 	make -C yelppack clean
@@ -15,5 +14,5 @@ itest_%:
 package: itest_lucid
 
 test:
-	go test terraform-provider-gitfile/gitfile
-	go test terraform-provider-gitfile
+	go test -v ./gitfile/...
+
