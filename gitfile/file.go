@@ -42,6 +42,9 @@ func fileCreateUpdate(d *schema.ResourceData, meta interface{}) error {
 	filepath := d.Get("path").(string)
 	contents := d.Get("contents").(string)
 
+	if err := os.MkdirAll(path.Dir(path.Join(checkout_dir, filepath)), 0755); err != nil {
+		return err
+	}
 	if err := ioutil.WriteFile(path.Join(checkout_dir, filepath), []byte(contents), 0666); err != nil {
 		return err
 	}

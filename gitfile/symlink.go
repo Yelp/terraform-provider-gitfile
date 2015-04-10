@@ -44,6 +44,9 @@ func symlinkCreateUpdate(d *schema.ResourceData, meta interface{}) error {
 	if err := os.Remove(path.Join(checkout_dir, filepath)); err != nil && !os.IsNotExist(err) {
 		return err
 	}
+	if err := os.MkdirAll(path.Dir(path.Join(checkout_dir, filepath)), 0755); err != nil {
+		return err
+	}
 	if err := os.Symlink(target, path.Join(checkout_dir, filepath)); err != nil {
 		return err
 	}
