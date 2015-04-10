@@ -38,12 +38,14 @@ This is mostly used to ensure that a checkout is present, before using the _gitf
 resource to commit some Terraform generated data.
 
 Inputs:
-    * repo - The git path to the repository, this can be anything you can feed to 'git clone'
-    * branch - The branch to checkout, defaults to 'master'
-    * path - The file path on filesystem for where to put the checkout
+
+  - repo - The git path to the repository, this can be anything you can feed to 'git clone'
+  - branch - The branch to checkout, defaults to 'master'
+  - path - The file path on filesystem for where to put the checkout
 
 Outputs:
-    * path - The file path on filesystem where the repository has been checked out
+
+  - path - The file path on filesystem where the repository has been checked out
 
 ### gitfile_commit
 
@@ -54,15 +56,17 @@ Note that even if the a file with the same contents Terraform creates already ex
 Terraform will create an empty commit with the specified commit message.
 
 Inputs:
-    * checkout_dir - The path to a git checkout, this can have been made by _gitfile_checkout_ or any other mechanism.
-    * file {} - Files to be committed, this block can be repeated multiple times. Each block contains:
-        * path - The path (within the repository) of the file to create
-        * contents - The contents to set the file to
+
+  - checkout_dir - The path to a git checkout, this can have been made by _gitfile_checkout_ or any other mechanism.
+  - file {} - Files to be committed, this block can be repeated multiple times. Each block contains:
+    - path - The path (within the repository) of the file to create
+    - contents - The contents to set the file to
 
 Outputs:
-    * commit_message - The commit message for the commit that will be made
-    * checkout_dir - The path to the git checkout input
-    * file - The file(s) committed to.
+
+  - commit_message - The commit message for the commit that will be made
+  - checkout_dir - The path to the git checkout input
+  - file - The file(s) committed to.
 
 # License
 
