@@ -10,10 +10,13 @@ clean:
 	rm -f terraform-provider-gitfile
 	rm -rf test/example.git test/checkout test/terraform.tfstate.backup test/terraform.tfstate
 
-terraform-provider-gitfile:
+terraform-provider-gitfile: test
 	go build
 
-integration:
+dev: terraform-provider-gitfile
+	cp terraform-provider-gitfile $$GOPATH/bin
+
+integration: dev
 	make -C test
 
 itest_%:
