@@ -15,4 +15,4 @@ ENV GOPATH /go
 RUN gem install fpm
 RUN ln -s /var/lib/gems/1.8/bin/fpm /usr/local/bin/fpm
 
-#WORKDIR /go/src/terraform-provider-gitfile
+#WORKDIR /go/src/github.com/Yelp/terraform-provider-gitfile

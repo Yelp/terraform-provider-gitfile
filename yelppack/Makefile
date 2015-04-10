@@ -1,7 +1,7 @@
 .PHONY: itest_% clean shell
 PROJECT = terraform-provider-gitfile
 
-VERSION = 0.2
+VERSION = 0.3
 ITERATION = yelp1
 ARCH := $(shell facter architecture)
 
@@ -20,7 +20,7 @@ $(PACKAGE_FILE): .docker_container_id
 
 .docker_container_id: .docker_image_id
 	docker run --rm=false \
-		-v $(CURDIR)/..:/go/src/terraform-provider-gitfile:ro \
+		-v $(CURDIR)/..:/go/src/github.com/Yelp/terraform-provider-gitfile:ro \
 		-v $(CURDIR)/build.sh:/build.sh:ro \
 		--cidfile=$(CURDIR)/.docker_container_id \
 		$$(cat .docker_image_id) \
