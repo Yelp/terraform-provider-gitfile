@@ -8,9 +8,8 @@ go:
 install:
   - wget https://dl.bintray.com/mitchellh/terraform/terraform_0.4.1_linux_amd64.zip
   - unzip terraform_0.4.1_linux_amd64.zip
-  - ls -l $HOME/gopath
-  - mv terraform* /home/travis/gopath/bin 
-  - ls -l $HOME/gopath
+  - mkdir $HOME/gopath/bin
+  - mv terraform* $HOME/gopath/bin 
 
 script:
   - make
