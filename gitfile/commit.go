@@ -9,22 +9,22 @@ import (
 const CommitBodyHeader string = "The following files are managed by terraform:"
 
 func commitResource() *schema.Resource {
-	return &schema.Resource {
-		Schema: map[string]*schema.Schema {
+	return &schema.Resource{
+		Schema: map[string]*schema.Schema{
 			"commit_message": &schema.Schema{
-				Type: schema.TypeString,
+				Type:     schema.TypeString,
 				Optional: true,
-				Default: "Created by terraform gitfile_commit",
+				Default:  "Created by terraform gitfile_commit",
 			},
-			"checkout_dir": &schema.Schema {
-				Type: schema.TypeString,
+			"checkout_dir": &schema.Schema{
+				Type:     schema.TypeString,
 				Required: true,
 				ForceNew: true,
 			},
-			"handles": &schema.Schema {
-				Type: schema.TypeSet,
+			"handles": &schema.Schema{
+				Type:     schema.TypeSet,
 				Required: true,
-				Set: hashString,
+				Set:      hashString,
 				ForceNew: true,
 				Elem: &schema.Schema{
 					Type: schema.TypeString,
@@ -32,7 +32,7 @@ func commitResource() *schema.Resource {
 			},
 		},
 		Create: CommitCreate,
-		Read: CommitRead,
+		Read:   CommitRead,
 		Update: CommitCreate,
 		Delete: CommitDelete,
 	}

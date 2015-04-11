@@ -1,38 +1,40 @@
 package gitfile
 
 import (
-	"os/exec"
 	"fmt"
-	"os"
 	"github.com/hashicorp/terraform/helper/schema"
+	"os"
+	"os/exec"
 	"strings"
 	"syscall"
 )
 
-
 func checkoutResource() *schema.Resource {
-	return &schema.Resource {
+	return &schema.Resource{
 		Schema: map[string]*schema.Schema{
 			"path": &schema.Schema{
-				Type: schema.TypeString,
+				Type:     schema.TypeString,
 				Optional: true,
+				ForceNew: true,
 			},
 			"repo": &schema.Schema{
-				Type: schema.TypeString,
+				Type:     schema.TypeString,
 				Required: true,
+				ForceNew: true,
 			},
 			"branch": &schema.Schema{
-				Type: schema.TypeString,
+				Type:     schema.TypeString,
 				Optional: true,
-				Default: "master",
+				Default:  "master",
+				ForceNew: true, // FIXME
 			},
 			"head": &schema.Schema{
-				Type: schema.TypeString,
+				Type:     schema.TypeString,
 				Computed: true,
 			},
 		},
 		Create: CheckoutCreate,
-		Read: CheckoutRead,
+		Read:   CheckoutRead,
 		Update: nil,
 		Delete: CheckoutDelete,
 	}
@@ -172,4 +174,3 @@ func CheckoutDelete(d *schema.ResourceData, meta interface{}) error {
 
 	return nil
 }
-

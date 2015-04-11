@@ -1,0 +1,17 @@
+---
+language: go
+
+go:
+  - 1.4
+  - tip
+
+install:
+  - wget https://dl.bintray.com/mitchellh/terraform/terraform_0.4.1_linux_amd64.zip
+  - unzip terraform_0.4.1_linux_amd64.zip
+  - mkdir $HOME/gopath/bin
+  - mv terraform* $HOME/gopath/bin 
+  - go get
+
+script:
+  - make integration
+

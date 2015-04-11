@@ -1,32 +1,32 @@
 package gitfile
 
 import (
+	"github.com/hashicorp/terraform/helper/schema"
 	"os"
 	"path"
-	"github.com/hashicorp/terraform/helper/schema"
 )
 
 func symlinkResource() *schema.Resource {
-	return &schema.Resource {
+	return &schema.Resource{
 		Schema: map[string]*schema.Schema{
 			"checkout_dir": &schema.Schema{
-				Type: schema.TypeString,
+				Type:     schema.TypeString,
 				Required: true,
 				ForceNew: true,
 			},
 			"path": &schema.Schema{
-				Type: schema.TypeString,
+				Type:     schema.TypeString,
 				Required: true,
 				ForceNew: true,
 			},
 			"target": &schema.Schema{
-				Type: schema.TypeString,
+				Type:     schema.TypeString,
 				Required: true,
 				ForceNew: true,
 			},
 		},
 		Create: symlinkCreateUpdate,
-		Read: symlinkRead,
+		Read:   symlinkRead,
 		Update: symlinkCreateUpdate,
 		Delete: symlinkDelete,
 		Exists: symlinkExists,

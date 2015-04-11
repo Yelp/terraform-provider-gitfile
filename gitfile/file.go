@@ -1,33 +1,33 @@
 package gitfile
 
 import (
+	"github.com/hashicorp/terraform/helper/schema"
 	"io/ioutil"
 	"os"
 	"path"
-	"github.com/hashicorp/terraform/helper/schema"
 )
 
 func fileResource() *schema.Resource {
-	return &schema.Resource {
+	return &schema.Resource{
 		Schema: map[string]*schema.Schema{
 			"checkout_dir": &schema.Schema{
-				Type: schema.TypeString,
+				Type:     schema.TypeString,
 				Required: true,
 				ForceNew: true,
 			},
 			"path": &schema.Schema{
-				Type: schema.TypeString,
+				Type:     schema.TypeString,
 				Required: true,
 				ForceNew: true,
 			},
 			"contents": &schema.Schema{
-				Type: schema.TypeString,
+				Type:     schema.TypeString,
 				Required: true,
 				ForceNew: true,
 			},
 		},
 		Create: fileCreateUpdate,
-		Read: fileRead,
+		Read:   fileRead,
 		Update: fileCreateUpdate,
 		Delete: fileDelete,
 		Exists: fileExists,

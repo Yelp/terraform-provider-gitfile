@@ -1,10 +1,10 @@
 package gitfile
 
 import (
-	"github.com/hashicorp/errwrap"
-	"os/exec"
 	"fmt"
+	"github.com/hashicorp/errwrap"
 	"github.com/hashicorp/terraform/helper/hashcode"
+	"os/exec"
 	"strings"
 	"sync"
 )

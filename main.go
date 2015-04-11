@@ -1,8 +1,8 @@
 package main
 
 import (
+	"github.com/Yelp/terraform-provider-gitfile/gitfile"
 	"github.com/hashicorp/terraform/plugin"
-	"terraform-provider-gitfile/gitfile"
 )
 
 func main() {

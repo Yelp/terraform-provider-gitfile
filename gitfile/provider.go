@@ -10,20 +10,18 @@ func Provider() terraform.ResourceProvider {
 		Schema: map[string]*schema.Schema{},
 		ResourcesMap: map[string]*schema.Resource{
 			"gitfile_checkout": checkoutResource(),
-			"gitfile_file": fileResource(),
-			"gitfile_symlink": symlinkResource(),
-			"gitfile_commit": commitResource(),
+			"gitfile_file":     fileResource(),
+			"gitfile_symlink":  symlinkResource(),
+			"gitfile_commit":   commitResource(),
 		},
 		ConfigureFunc: gitfileConfigure,
 	}
 }
 
 func gitfileConfigure(data *schema.ResourceData) (interface{}, error) {
-	config := &gitfileConfig {
-	}
+	config := &gitfileConfig{}
 	return config, nil
 }
 
 type gitfileConfig struct {
 }
-
