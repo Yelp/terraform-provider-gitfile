@@ -10,6 +10,7 @@ install:
   - unzip terraform_0.4.1_linux_amd64.zip
   - mkdir $HOME/gopath/bin
   - mv terraform* $HOME/gopath/bin 
+  - go get
 
 script:
   - make
