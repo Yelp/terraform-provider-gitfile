@@ -13,5 +13,5 @@ install:
   - go get
 
 script:
-  - make
+  - make integration
 
