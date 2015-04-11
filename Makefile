@@ -14,7 +14,7 @@ terraform-provider-gitfile: test
 	go build
 
 dev: terraform-provider-gitfile
-	cp terraform-provider-gitfile $$GOPATH/bin
+	cp terraform-provider-gitfile $$(echo $$GOPATH|sed -e's/://')/bin
 
 integration: dev
 	make -C test
