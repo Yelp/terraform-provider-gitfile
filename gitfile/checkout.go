@@ -66,6 +66,12 @@ func CheckoutCreate(d *schema.ResourceData, meta interface{}) error {
 
 func CheckoutRead(d *schema.ResourceData, meta interface{}) error {
 	checkout_dir := d.Id()
+
+	if _, err := os.Stat(checkout_dir); err != nil {
+		d.SetId("")
+		return nil
+	}
+
 	lockCheckout(checkout_dir)
 	defer unlockCheckout(checkout_dir)
 
