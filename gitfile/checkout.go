@@ -16,6 +16,14 @@ func checkoutResource() *schema.Resource {
 				Type:     schema.TypeString,
 				Optional: true,
 				ForceNew: true,
+				ValidateFunc: func(v interface{}, k string) (ws []string, es []error) {
+					value := v.(string)
+					i := strings.IndexRune(value, '/')
+					if i == -1 || i >= 1 {
+						es = append(es, fmt.Errorf("Paths which begin with / not allowed in %q", k))
+					}
+					return
+				},
 			},
 			"repo": &schema.Schema{
 				Type:     schema.TypeString,
