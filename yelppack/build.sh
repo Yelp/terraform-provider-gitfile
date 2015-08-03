@@ -4,8 +4,14 @@ project=$1
 version=$2
 iteration=$3
 
-go get ${project}
+cd /go/src/github.com/Yelp/terraform-provider-gitfile
+go get
+go build .
 mkdir /dist && cd /dist
+ln -s /go/bin bin
 fpm -s dir -t deb --name ${project} \
     --iteration ${iteration} --version ${version} \
-    /go/bin/${project}=/usr/bin/
+    --prefix /usr/ \
+    ./bin/
+rm bin
+
