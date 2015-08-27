@@ -57,8 +57,11 @@ func CheckoutCreate(d *schema.ResourceData, meta interface{}) error {
 		return err
 	}
 
-	if _, err := gitCommand(checkout_dir, "clone", "-b", branch, "--", repo, "."); err != nil {
-		return err
+	// May already be checked out from another project
+	if _, err := os.Stat(fmt.Sprintf("%s/.git", checkout_dir)); err != nil {
+		if _, err := gitCommand(checkout_dir, "clone", "-b", branch, "--", repo, "."); err != nil {
+			return err
+		}
 	}
 	var head string
 	if out, err := gitCommand(checkout_dir, "rev-parse", "HEAD"); err != nil {
