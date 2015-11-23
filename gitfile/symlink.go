@@ -27,7 +27,6 @@ func symlinkResource() *schema.Resource {
 		},
 		Create: symlinkCreateUpdate,
 		Read:   symlinkRead,
-		Update: symlinkCreateUpdate,
 		Delete: symlinkDelete,
 		Exists: symlinkExists,
 	}

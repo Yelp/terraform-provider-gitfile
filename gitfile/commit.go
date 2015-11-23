@@ -33,7 +33,6 @@ func commitResource() *schema.Resource {
 		},
 		Create: CommitCreate,
 		Read:   CommitRead,
-		Update: CommitCreate,
 		Delete: CommitDelete,
 	}
 }

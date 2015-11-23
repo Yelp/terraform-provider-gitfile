@@ -28,7 +28,6 @@ func fileResource() *schema.Resource {
 		},
 		Create: fileCreateUpdate,
 		Read:   fileRead,
-		Update: fileCreateUpdate,
 		Delete: fileDelete,
 		Exists: fileExists,
 	}
