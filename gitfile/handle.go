@@ -20,6 +20,9 @@ func parseHandle(s string) *handle {
 	splits := strings.SplitN(s, " ", 3)
 	var hash int
 	var err error
+	if len(splits) < 3 {
+		panic(fmt.Sprintf("Could not split handle into 3 parts: '%s'", s))
+	}
 	if hash, err = strconv.Atoi(splits[1]); err != nil {
 		panic(err)
 	}
