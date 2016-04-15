@@ -1,18 +1,14 @@
 #!/bin/bash
 
-set -e
-
 project=$1
 version=$2
 iteration=$3
 
-cd /go/src/github.com/Yelp/terraform-provider-gitfile
-go get
-go test ./...
-go build .
+go get github.com/Yelp/${project}
 mkdir /dist && cd /dist
-fpm -s dir -t deb --name ${project} \
+mkdir /tmp/usrbin
+ln -s /nail/opt/bin/${project} /tmp/usrbin/${project}
+fpm -s dir -t deb --deb-no-default-config-files --name ${project} \
     --iteration ${iteration} --version ${version} \
-    --prefix /usr/bin/ \
-    /go/bin/terraform-provider-gitfile
-
+    /tmp/usrbin/${project}=/usr/bin/ \
+    /go/bin/${project}=/nail/opt/bin/

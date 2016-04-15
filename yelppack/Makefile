@@ -2,7 +2,7 @@
 PROJECT = terraform-provider-gitfile
 
 VERSION = 0.4
-ITERATION = yelp4
+ITERATION = yelp5
 ARCH := $(shell facter architecture)
 
 PACKAGE_NAME := $(PROJECT)_$(VERSION)-$(ITERATION)_$(ARCH).deb
