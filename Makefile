@@ -20,6 +20,7 @@ integration: dev
 	make -C test
 
 itest_%:
+	mkdir -p dist
 	make -C yelppack $@
 
 package: itest_lucid
