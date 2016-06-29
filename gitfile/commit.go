@@ -15,16 +15,16 @@ func commitResource() *schema.Resource {
 				Type:     schema.TypeString,
 				Optional: true,
 				Default:  "Created by terraform gitfile_commit",
+				ForceNew: true,
 			},
 			"checkout_dir": &schema.Schema{
 				Type:     schema.TypeString,
 				Required: true,
 				ForceNew: true,
 			},
-			"handles": &schema.Schema{
-				Type:     schema.TypeSet,
+			"handle": &schema.Schema{
+				Type:     schema.TypeString,
 				Required: true,
-				Set:      hashString,
 				ForceNew: true,
 				Elem: &schema.Schema{
 					Type: schema.TypeString,
@@ -33,8 +33,8 @@ func commitResource() *schema.Resource {
 		},
 		Create: CommitCreate,
 		Read:   CommitRead,
-        Update: CommitCreate,
 		Delete: CommitDelete,
+		Exists: CommitExists,
 	}
 }
 
@@ -43,17 +43,14 @@ func CommitCreate(d *schema.ResourceData, meta interface{}) error {
 	lockCheckout(checkout_dir)
 	defer unlockCheckout(checkout_dir)
 
-	handles := d.Get("handles").(*schema.Set)
+	handle := d.Get("handle").(string)
 	commit_message := d.Get("commit_message").(string)
-	filepaths := []string{}
-	for _, handle := range handles.List() {
-		filepaths = append(filepaths, parseHandle(handle.(string)).path)
-	}
+	filepath := parseHandle(handle).path
 
 	var sha string
 
-	commit_body := fmt.Sprintf("%s\n%s", CommitBodyHeader, strings.Join(filepaths, "\n"))
-	if _, err := gitCommand(checkout_dir, flatten("commit", "-m", commit_message, "-m", commit_body, "--allow-empty", "--", filepaths)...); err != nil {
+	commit_body := fmt.Sprintf("%s\n%s", CommitBodyHeader, filepath)
+	if _, err := gitCommand(checkout_dir, flatten("commit", "-m", commit_message, "-m", commit_body, "--allow-empty", "--", filepath)...); err != nil {
 		return err
 	}
 
@@ -75,6 +72,23 @@ func CommitRead(d *schema.ResourceData, meta interface{}) error {
 	return nil
 }
 
+func CommitExists(d *schema.ResourceData, meta interface{}) (bool, error) {
+	checkoutDir := d.Get("checkout_dir").(string)
+	lockCheckout(checkoutDir)
+	defer unlockCheckout(checkoutDir)
+	commitId := strings.Split(d.Id(), " ")[0]
+
+	_, err := gitCommand(checkoutDir, flatten("show", commitId)...)
+
+	if err != nil {
+		return false, nil
+	} else {
+		return true, nil
+	}
+
+}
+
 func CommitDelete(d *schema.ResourceData, meta interface{}) error {
+	d.SetId("")
 	return nil
 }

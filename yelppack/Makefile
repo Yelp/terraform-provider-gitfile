@@ -1,8 +1,8 @@
 .PHONY: itest_% clean shell
 PROJECT = terraform-provider-gitfile
 
-VERSION = 0.4
-ITERATION = yelp5
+VERSION = 0.5
+ITERATION = yelp1
 ARCH := $(shell facter architecture)
 
 PACKAGE_NAME := $(PROJECT)_$(VERSION)-$(ITERATION)_$(ARCH).deb
