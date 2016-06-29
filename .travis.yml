@@ -6,7 +6,7 @@ go:
   - tip
 
 install:
-  - wget https://codeload.github.com/hashicorp/terraform/zip/v0.6.16
+  - wget https://codeload.github.com/hashicorp/terraform/zip/v0.6.16 --no-check-certificate -O terraform-0.6.16.zip
   - unzip terraform-0.6.16.zip
   - mkdir $HOME/gopath/bin
   - mv terraform* $HOME/gopath/bin 
