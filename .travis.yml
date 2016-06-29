@@ -2,12 +2,12 @@
 language: go
 
 go:
-  - 1.4
+  - 1.6
   - tip
 
 install:
-  - wget https://dl.bintray.com/mitchellh/terraform/terraform_0.4.1_linux_amd64.zip
-  - unzip terraform_0.4.1_linux_amd64.zip
+  - wget https://codeload.github.com/hashicorp/terraform/zip/v0.6.16
+  - unzip terraform-0.6.16.zip
   - mkdir $HOME/gopath/bin
   - mv terraform* $HOME/gopath/bin 
   - go get
