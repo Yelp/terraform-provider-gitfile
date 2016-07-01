@@ -15,5 +15,7 @@ ENV PATH /usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/usr/local/sbin:/usr/local
 ENV GOPATH /go
 RUN mkdir /go
 RUN gem install fpm
-
+RUN git clone https://github.com/yelp/terraform.git /go/src/github.com/hashicorp/terraform && \
+    cd /go/src/github.com/hashicorp/terraform && \
+        git checkout d7dc7c08eddf3b821650b284bdd1f77a02cb51c2
 #WORKDIR /go/src/github.com/Yelp/terraform-provider-gitfile
