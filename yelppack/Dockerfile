@@ -14,6 +14,7 @@ RUN wget https://storage.googleapis.com/golang/go1.6.linux-amd64.tar.gz && tar x
 ENV PATH /usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/usr/local/sbin:/usr/local/go/bin:/go/bin
 ENV GOPATH /go
 RUN mkdir /go
+RUN gem install json  -v 1.8.3
 RUN gem install fpm
 RUN git clone https://github.com/yelp/terraform.git /go/src/github.com/hashicorp/terraform && \
     cd /go/src/github.com/hashicorp/terraform && \
