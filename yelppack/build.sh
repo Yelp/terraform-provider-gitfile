@@ -11,4 +11,4 @@ ln -s /nail/opt/bin/${project} /tmp/usrbin/${project}
 fpm -s dir -t deb --deb-no-default-config-files --name ${project} \
     --iteration ${iteration} --version ${version} \
     /tmp/usrbin/${project}=/usr/bin/ \
-    /go/bin/${project}=/nail/opt/bin/
+    /go/bin/${project}=/nail/opt/terraform-0.7/bin/
