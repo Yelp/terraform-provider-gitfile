@@ -3,4 +3,4 @@
 set -eu
 
 dpkg -i "$1"
-test -x /usr/bin/terraform-provider-gitfile
+test -x /nail/opt/terraform-0.7/bin/terraform-provider-gitfile
