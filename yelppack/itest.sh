@@ -2,5 +2,8 @@
 
 set -eu
 
+tf_version=$2
+
 dpkg -i "$1"
-test -x /nail/opt/terraform-0.7/bin/terraform-provider-gitfile
+echo "installed package"
+test -x /nail/opt/terraform-${tf_version}/bin/terraform-provider-gitfile
